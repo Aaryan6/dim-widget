@@ -17,7 +17,7 @@ namespace DimWidget
         private PumpForm _pump;
         private DimController _dim;
         private WidgetForm _widget;
-        private bool _startedByWindows;
+        private bool _forceCollapsed;
         private volatile bool _running;
         private volatile bool _disposed;
 
@@ -33,6 +33,7 @@ namespace DimWidget
         }
 
         public event EventHandler Changed;
+        public event EventHandler QuitRequested;
 
         public bool Running
         {
@@ -64,9 +65,9 @@ namespace DimWidget
             get { return _widget; }
         }
 
-        public bool Start(bool startedByWindows)
+        public bool Start(bool forceCollapsed)
         {
-            _startedByWindows = startedByWindows;
+            _forceCollapsed = forceCollapsed;
             _running = true;
 
             AutoResetEvent ready = new AutoResetEvent(false);
@@ -92,6 +93,11 @@ namespace DimWidget
 
                 DimController dim = new DimController(_settings.Brightness, _settings.Suspended);
                 WidgetForm widget = new WidgetForm(dim, _settings);
+                widget.QuitRequested += delegate
+                {
+                    EventHandler handler = QuitRequested;
+                    if (handler != null) handler(this, EventArgs.Empty);
+                };
 
                 _dim = dim;
                 _widget = widget;
@@ -99,7 +105,7 @@ namespace DimWidget
                 _suspended = dim.Suspended ? 1 : 0;
                 Interlocked.Exchange(ref _widgetHandle, widget.Handle.ToInt64());
 
-                widget.Start(_startedByWindows);
+                widget.Start(_forceCollapsed);
                 dim.Changed += OnDimChanged;
                 dim.TopmostTick += OnTopmostTick;
 
@@ -285,6 +291,17 @@ namespace DimWidget
                 Bounds = new Rectangle(-4000, -4000, 1, 1);
                 Opacity = 0d;
                 TabStop = false;
+            }
+
+            protected override CreateParams CreateParams
+            {
+                get
+                {
+                    CreateParams cp = base.CreateParams;
+                    // The invisible message pump must not get a switcher thumbnail.
+                    cp.ExStyle |= NativeMethods.WS_EX_TOOLWINDOW;
+                    return cp;
+                }
             }
 
             protected override bool ShowWithoutActivation

@@ -85,7 +85,9 @@ namespace DimWidget
             _desktopTimer.Interval = 80;
             _desktopTimer.Tick += OnDesktopTick;
 
-            if (!_ui.Start(startedByWindows))
+            // A fresh launch always starts as a notch; desktop switches may
+            // still preserve the current expanded state in RestartUi.
+            if (!_ui.Start(true))
             {
                 DebugLog.Write("start failed: ui thread did not come up");
             }
@@ -119,6 +121,7 @@ namespace DimWidget
         {
             UiHost ui = new UiHost(_settings);
             ui.Changed += OnUiChanged;
+            ui.QuitRequested += delegate { OnMain(Shutdown); };
             return ui;
         }
 

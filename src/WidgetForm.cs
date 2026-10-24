@@ -19,6 +19,8 @@ namespace DimWidget
         private const int ValueWidth = 29;
         private const int RightPad = 8;
         private const int Gap = 8;
+        private const int CloseWidth = 20;
+        private const int CloseGap = 5;
         private const int IdleRadius = 10;
         private const int OpenRadius = 12;
         private const float IconSize = 11f;
@@ -45,6 +47,7 @@ namespace DimWidget
         private readonly Settings _settings;
         private readonly float _scale;
         private readonly Font _fontValue;
+        private readonly Button _quitButton;
         private readonly System.Windows.Forms.Timer _animate;
         private readonly System.Windows.Forms.Timer _closeDelay;
 
@@ -65,6 +68,8 @@ namespace DimWidget
         private DateTime _ignoreDeactivateUntil = DateTime.MinValue;
 
         public DateTime LastCollapsedUtc { get; private set; }
+
+        public event EventHandler QuitRequested;
 
         public int AnchorX
         {
@@ -104,6 +109,38 @@ namespace DimWidget
 
             _fontValue = Theme.Ui(7.5f, FontStyle.Bold);
 
+            _quitButton = new RoundCloseButton();
+            _quitButton.Paint += delegate(object sender, PaintEventArgs e)
+            {
+                float centerX = (_quitButton.ClientSize.Width - 1) / 2f;
+                float centerY = (_quitButton.ClientSize.Height - 1) / 2f;
+                float radius = ScaleF(4f);
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using (Pen stroke = new Pen(InkMuted, ScaleF(1.2f)))
+                {
+                    stroke.StartCap = stroke.EndCap = LineCap.Round;
+                    e.Graphics.DrawLine(stroke, centerX - radius, centerY - radius,
+                        centerX + radius, centerY + radius);
+                    e.Graphics.DrawLine(stroke, centerX + radius, centerY - radius,
+                        centerX - radius, centerY + radius);
+                }
+            };
+            _quitButton.AccessibleName = "Quit Dim";
+            _quitButton.FlatStyle = FlatStyle.Flat;
+            _quitButton.FlatAppearance.BorderSize = 0;
+            _quitButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(45, 45, 45);
+            _quitButton.FlatAppearance.MouseDownBackColor = Color.FromArgb(70, 35, 35);
+            _quitButton.BackColor = Panel;
+            _quitButton.ForeColor = InkMuted;
+            _quitButton.Cursor = Cursors.Hand;
+            _quitButton.Visible = false;
+            _quitButton.Click += delegate
+            {
+                EventHandler handler = QuitRequested;
+                if (handler != null) handler(this, EventArgs.Empty);
+            };
+            Controls.Add(_quitButton);
+
             _animate = new System.Windows.Forms.Timer();
             _animate.Interval = 16;
             _animate.Tick += OnAnimateTick;
@@ -115,6 +152,17 @@ namespace DimWidget
 
 
             ResumeLayout(false);
+        }
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams cp = base.CreateParams;
+                // Keep the widget out of the shell's window switcher.
+                cp.ExStyle |= NativeMethods.WS_EX_TOOLWINDOW;
+                return cp;
+            }
         }
 
         protected override bool ShowWithoutActivation
@@ -270,6 +318,11 @@ namespace DimWidget
 
             _anchorX = ClampAnchorX(_anchorX);
             Location = new Point(_anchorX - width / 2, _anchorTop);
+
+            _quitButton.Bounds = new Rectangle(
+                width - Scale(RightPad + CloseWidth), (height - Scale(CloseWidth)) / 2,
+                Scale(CloseWidth), Scale(CloseWidth));
+            _quitButton.Visible = _expanded && _open >= 0.95f;
 
             ApplyShape();
             Invalidate();
@@ -471,7 +524,7 @@ namespace DimWidget
                     coreRadius * 2f);
             }
 
-            float valueLeft = ClientSize.Width - ScaleF(RightPad + ValueWidth);
+            float valueLeft = ClientSize.Width - ScaleF(RightPad + CloseWidth + CloseGap + ValueWidth);
             Rectangle box = new Rectangle(
                 (int)Math.Round(valueLeft),
                 0,
@@ -502,7 +555,7 @@ namespace DimWidget
             }
 
             left = ScaleF(HandleWidth) + ScaleF(1f);
-            right = ClientSize.Width - ScaleF(RightPad + ValueWidth + Gap);
+            right = ClientSize.Width - ScaleF(RightPad + CloseWidth + CloseGap + ValueWidth + Gap);
             centerY = ClientSize.Height / 2f;
 
             return right - left > ScaleF(14f);
@@ -811,6 +864,24 @@ namespace DimWidget
         private float ScaleF(float value)
         {
             return value * _scale;
+        }
+
+        private sealed class RoundCloseButton : Button
+        {
+            protected override bool ShowFocusCues { get { return false; } }
+
+            protected override void OnSizeChanged(EventArgs e)
+            {
+                base.OnSizeChanged(e);
+                if (Width <= 0 || Height <= 0) return;
+                using (GraphicsPath circle = new GraphicsPath())
+                {
+                    circle.AddEllipse(ClientRectangle);
+                    Region previous = Region;
+                    Region = new Region(circle);
+                    if (previous != null) previous.Dispose();
+                }
+            }
         }
 
         protected override void Dispose(bool disposing)
