@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect x="26" y="26" width="972" height="972" rx="220" fill="#000000"/>
+  <mask id="disc">
+    <circle cx="512" cy="512" r="288" fill="#ffffff"/>
+  </mask>
+  <g mask="url(#disc)">
+    <rect x="224" y="224" width="288" height="576" fill="#81C8F2"/>
+    <rect x="512" y="224" width="288" height="576" fill="#EDF9F7"/>
+  </g>
+</svg>

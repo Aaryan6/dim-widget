@@ -67,13 +67,17 @@ namespace DimWidget
 
         public static Icon CreateTrayIcon()
         {
-            Icon extracted = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
-            if (extracted != null)
+            System.IO.Stream stream = typeof(Theme).Assembly.GetManifestResourceStream("DimWidget.icon.ico");
+            if (stream == null)
             {
-                return extracted;
+                return SystemIcons.Application;
             }
 
-            return SystemIcons.Application;
+            using (stream)
+            using (Icon icon = new Icon(stream, 64, 64))
+            {
+                return (Icon)icon.Clone();
+            }
         }
 
         public static void Prepare(Graphics g)
