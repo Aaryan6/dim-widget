@@ -1,6 +1,8 @@
 # Dim
 
-![The notch at the top of the screen, with a slider for brightness](assets/notch.gif)
+<p align="center">
+  <img src="assets/notch.gif" alt="The notch at the top of the screen, with a slider for brightness" width="100%">
+</p>
 
 Dim makes your screen darker. It is a small Windows program. You do not install anything else.
 
