@@ -1,27 +1,42 @@
 # Dim
 
-A Windows tray app that dims the desktop. A small tab hangs from the top of the screen. Drag the slider, or hold Ctrl+Alt and scroll, to change how much of the screen still shows through.
+Dim makes your screen darker. It is a small Windows program. You do not install anything else.
 
-## Build
+## Download
 
-You need Windows and the .NET Framework compiler that ships with Visual Studio or the Build Tools. `build.ps1` looks for Roslyn `csc.exe` and links against .NET Framework 4.x.
+1. Click [Download Dim](https://github.com/Aaryan6/dim-widget/releases/latest/download/DimWidget.exe) and save the file.
+2. Open your Downloads folder.
+3. Double-click `DimWidget.exe`.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\build.ps1
-```
+Windows may say it protected your PC. That happens because Dim is not from the Microsoft Store. Click **More info**, then **Run anyway**.
 
-That writes `bin\DimWidget.exe`.
+A moon icon shows up by the clock. A small tab also appears at the top of the screen. If you do not see the moon, click the upward arrow next to the clock and look for it there.
 
-## Run
+## Make the screen darker or brighter
 
-Start `bin\DimWidget.exe`. It sits in the notification area. Launching it again focuses the copy that is already running.
+Click the tab at the top of the screen, then drag the slider.
 
-- Drag the tab at the top of the screen.
-- Ctrl+Alt and the scroll wheel changes brightness.
-- Ctrl+Alt and + or - steps brightness by 5.
-- Ctrl+Alt+0 sets brightness back to 100%.
-- Ctrl+Alt+D pauses dimming.
+You can also hold the Ctrl and Alt keys and roll the mouse wheel.
 
-Right-click the tray icon for 100%, 75%, 50%, and 25% presets, pause, start with Windows, and quit.
+## Shortcuts
 
-Settings are stored in `%AppData%\DimWidget\settings.ini`.
+- Hold Ctrl and Alt, then press the + key. The screen gets brighter.
+- Hold Ctrl and Alt, then press the - key. The screen gets darker.
+- Hold Ctrl and Alt, then press 0. Brightness goes back to normal.
+- Hold Ctrl and Alt, then press D. Dimming pauses.
+
+## The menu
+
+Right-click the moon icon by the clock.
+
+- **Show controls** opens the tab.
+- **Pause dimming** turns the dark layer off until you turn it back on.
+- **Brightness** has 100%, 75%, 50%, and 25%. 100% is a normal screen.
+- **Start with Windows** opens Dim each time the computer turns on.
+- **Quit Dim** closes the program. The screen goes back to normal.
+
+## Turn it off
+
+Right-click the moon icon and choose **Quit Dim**.
+
+Dim works on Windows 10 and Windows 11.
