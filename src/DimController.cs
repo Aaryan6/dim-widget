@@ -55,12 +55,14 @@ namespace DimWidget
         public void SetBrightness(int value)
         {
             int next = Settings.Clamp(value);
-            if (next == _brightness)
+            bool resume = _suspended;
+            if (next == _brightness && !resume)
             {
                 return;
             }
 
             _brightness = next;
+            _suspended = false;
             Apply();
             RaiseChanged();
         }
