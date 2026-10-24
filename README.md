@@ -12,7 +12,7 @@ Dim makes your screen darker. It is a small Windows program. You do not install 
 
 Windows may say it protected your PC. That happens because Dim is not from the Microsoft Store. Click **More info**, then **Run anyway**.
 
-A moon icon shows up by the clock. A small tab also appears at the top of the screen. If you do not see the moon, click the upward arrow next to the clock and look for it there.
+An icon shows up by the clock. A small tab also appears at the top of the screen. If you do not see the icon, click the upward arrow next to the clock and look for it there.
 
 ## Make the screen darker or brighter
 
@@ -29,7 +29,7 @@ You can also hold the Ctrl and Alt keys and roll the mouse wheel.
 
 ## The menu
 
-Right-click the moon icon by the clock.
+Right-click the icon by the clock.
 
 - **Show controls** opens the tab.
 - **Pause dimming** turns the dark layer off until you turn it back on.
@@ -39,6 +39,6 @@ Right-click the moon icon by the clock.
 
 ## Turn it off
 
-Right-click the moon icon and choose **Quit Dim**.
+Right-click the icon by the clock and choose **Quit Dim**.
 
 Dim works on Windows 10 and Windows 11.

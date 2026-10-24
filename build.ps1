@@ -34,25 +34,22 @@ New-Item -ItemType Directory -Force -Path (Join-Path $root 'assets') | Out-Null
 Add-Type -AssemblyName System.Drawing
 
 $iconPath = Join-Path $root 'assets\icon.ico'
+$iconPng = Join-Path $root 'assets\icon.png'
 $iconSize = 256
-$moonAccent = [System.Drawing.Color]::FromArgb(255, 255, 209, 102)
 
+if (-not (Test-Path -LiteralPath $iconPng)) {
+    throw "Missing icon: $iconPng"
+}
+
+$sourceIcon = [System.Drawing.Image]::FromFile($iconPng)
 $iconBitmap = New-Object System.Drawing.Bitmap $iconSize, $iconSize, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
 $iconGraphics = [System.Drawing.Graphics]::FromImage($iconBitmap)
-$iconGraphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+$iconGraphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+$iconGraphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
 $iconGraphics.Clear([System.Drawing.Color]::Transparent)
-
-$moonBrush = New-Object System.Drawing.SolidBrush $moonAccent
-$iconGraphics.FillEllipse($moonBrush, 16, 16, 224, 224)
-
-$iconGraphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
-$cutBrush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(0, 0, 0, 0))
-$iconGraphics.FillEllipse($cutBrush, 82, -12, 226, 226)
-$iconGraphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceOver
-
-$moonBrush.Dispose()
-$cutBrush.Dispose()
+$iconGraphics.DrawImage($sourceIcon, 0, 0, $iconSize, $iconSize)
 $iconGraphics.Dispose()
+$sourceIcon.Dispose()
 
 $pngStream = New-Object System.IO.MemoryStream
 $iconBitmap.Save($pngStream, [System.Drawing.Imaging.ImageFormat]::Png)

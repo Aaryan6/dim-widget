@@ -1,7 +1,6 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.Drawing.Text;
 using System.Windows.Forms;
 
@@ -68,40 +67,13 @@ namespace DimWidget
 
         public static Icon CreateTrayIcon()
         {
-            const int size = 64;
-            using (Bitmap bmp = new Bitmap(size, size, PixelFormat.Format32bppArgb))
+            Icon extracted = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            if (extracted != null)
             {
-                using (Graphics g = Graphics.FromImage(bmp))
-                {
-                    g.SmoothingMode = SmoothingMode.AntiAlias;
-                    g.Clear(Color.Transparent);
-
-                    using (SolidBrush moon = new SolidBrush(Accent))
-                    {
-                        g.FillEllipse(moon, 4f, 4f, size - 8f, size - 8f);
-                    }
-
-                    g.CompositingMode = CompositingMode.SourceCopy;
-                    using (SolidBrush cut = new SolidBrush(Color.FromArgb(0, 0, 0, 0)))
-                    {
-                        g.FillEllipse(cut, size * 0.32f, -size * 0.04f, size - 4f, size - 4f);
-                    }
-                    g.CompositingMode = CompositingMode.SourceOver;
-                }
-
-                IntPtr handle = bmp.GetHicon();
-                try
-                {
-                    using (Icon temp = Icon.FromHandle(handle))
-                    {
-                        return (Icon)temp.Clone();
-                    }
-                }
-                finally
-                {
-                    NativeMethods.DestroyIcon(handle);
-                }
+                return extracted;
             }
+
+            return SystemIcons.Application;
         }
 
         public static void Prepare(Graphics g)
