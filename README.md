@@ -1,5 +1,7 @@
 # Dim
 
+![The notch at the top of the screen, with a slider for brightness](assets/notch.gif)
+
 Dim makes your screen darker. It is a small Windows program. You do not install anything else.
 
 ## Download
