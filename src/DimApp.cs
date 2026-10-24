@@ -6,17 +6,12 @@ namespace DimWidget
 {
     internal sealed class DimApp : ApplicationContext
     {
-        private const int HotkeyBrighter = 101;
-        private const int HotkeyDimmer = 102;
-        private const int HotkeyReset = 103;
-        private const int HotkeyPause = 104;
-
         private readonly Settings _settings;
         private readonly NotifyIcon _tray;
         private readonly ContextMenuStrip _menu;
         private readonly ToolStripMenuItem _pauseItem;
         private readonly ToolStripMenuItem _autoStartItem;
-        private readonly HotkeyWindow _hotkeys;
+        private readonly KeyboardHook _keys;
         private readonly MouseWheelHook _wheel;
         private readonly DesktopWatcher _desktop;
         private readonly System.Windows.Forms.Timer _desktopTimer;
@@ -77,13 +72,9 @@ namespace DimWidget
             _tray.Visible = true;
             _tray.MouseClick += OnTrayClick;
 
-            _hotkeys = new HotkeyWindow();
-            uint modifiers = NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT | NativeMethods.MOD_NOREPEAT;
-            _hotkeys.TryRegister(HotkeyBrighter, modifiers, NativeMethods.VK_OEM_PLUS);
-            _hotkeys.TryRegister(HotkeyDimmer, modifiers, NativeMethods.VK_OEM_MINUS);
-            _hotkeys.TryRegister(HotkeyReset, modifiers, 0x30);
-            _hotkeys.TryRegister(HotkeyPause, modifiers, 0x44);
-            _hotkeys.HotkeyPressed += OnHotkey;
+            _keys = new KeyboardHook();
+            _keys.Pressed += OnHotkey;
+            _keys.Install();
 
             _wheel = new MouseWheelHook();
             _wheel.DimmingWheel += OnDimmingWheel;
@@ -284,19 +275,19 @@ namespace DimWidget
         {
             switch (id)
             {
-                case HotkeyBrighter:
+                case KeyboardHook.Brighter:
                     Nudge(5);
                     break;
 
-                case HotkeyDimmer:
+                case KeyboardHook.Dimmer:
                     Nudge(-5);
                     break;
 
-                case HotkeyReset:
+                case KeyboardHook.Reset:
                     SetBrightness(100);
                     break;
 
-                case HotkeyPause:
+                case KeyboardHook.Pause:
                     Post(delegate()
                     {
                         DimController dim = _ui.Dim;
@@ -519,7 +510,7 @@ namespace DimWidget
             }
 
             _wheel.Dispose();
-            _hotkeys.Dispose();
+            _keys.Dispose();
             _desktop.Dispose();
 
             try
