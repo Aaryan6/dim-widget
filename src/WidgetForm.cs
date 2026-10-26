@@ -109,27 +109,8 @@ namespace DimWidget
 
             _fontValue = Theme.Ui(7.5f, FontStyle.Bold);
 
-            _quitButton = new RoundCloseButton();
-            _quitButton.Paint += delegate(object sender, PaintEventArgs e)
-            {
-                float centerX = (_quitButton.ClientSize.Width - 1) / 2f;
-                float centerY = (_quitButton.ClientSize.Height - 1) / 2f;
-                float radius = ScaleF(4f);
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using (Pen stroke = new Pen(InkMuted, ScaleF(1.2f)))
-                {
-                    stroke.StartCap = stroke.EndCap = LineCap.Round;
-                    e.Graphics.DrawLine(stroke, centerX - radius, centerY - radius,
-                        centerX + radius, centerY + radius);
-                    e.Graphics.DrawLine(stroke, centerX + radius, centerY - radius,
-                        centerX - radius, centerY + radius);
-                }
-            };
+            _quitButton = new RoundCloseButton(_scale);
             _quitButton.AccessibleName = "Quit Dim";
-            _quitButton.FlatStyle = FlatStyle.Flat;
-            _quitButton.FlatAppearance.BorderSize = 0;
-            _quitButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(45, 45, 45);
-            _quitButton.FlatAppearance.MouseDownBackColor = Color.FromArgb(70, 35, 35);
             _quitButton.BackColor = Panel;
             _quitButton.ForeColor = InkMuted;
             _quitButton.Cursor = Cursors.Hand;
@@ -868,7 +849,101 @@ namespace DimWidget
 
         private sealed class RoundCloseButton : Button
         {
+            private readonly float _scale;
+            private bool _hovered;
+            private bool _mousePressed;
+            private bool _spacePressed;
+
+            public RoundCloseButton(float scale)
+            {
+                _scale = scale;
+                FlatStyle = FlatStyle.Flat;
+                FlatAppearance.BorderSize = 0;
+                UseVisualStyleBackColor = false;
+                SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint
+                    | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            }
+
             protected override bool ShowFocusCues { get { return false; } }
+
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                // Own every pixel: the standard Button painter can leave a
+                // one-pixel edge in focused, default, or pressed states.
+                bool pressed = Enabled && ((_mousePressed && _hovered) || _spacePressed);
+                Color background = pressed ? Color.FromArgb(70, 35, 35)
+                    : Enabled && _hovered ? Color.FromArgb(45, 45, 45) : BackColor;
+                e.Graphics.Clear(background);
+
+                float centerX = (ClientSize.Width - 1) / 2f;
+                float centerY = (ClientSize.Height - 1) / 2f;
+                float radius = 4f * _scale;
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using (Pen stroke = new Pen(ForeColor, 1.2f * _scale))
+                {
+                    stroke.StartCap = stroke.EndCap = LineCap.Round;
+                    e.Graphics.DrawLine(stroke, centerX - radius, centerY - radius,
+                        centerX + radius, centerY + radius);
+                    e.Graphics.DrawLine(stroke, centerX + radius, centerY - radius,
+                        centerX - radius, centerY + radius);
+                }
+            }
+
+            protected override void OnMouseEnter(EventArgs e)
+            {
+                _hovered = true;
+                base.OnMouseEnter(e);
+                Invalidate();
+            }
+
+            protected override void OnMouseLeave(EventArgs e)
+            {
+                _hovered = false;
+                base.OnMouseLeave(e);
+                Invalidate();
+            }
+
+            protected override void OnMouseDown(MouseEventArgs e)
+            {
+                if (e.Button == MouseButtons.Left) _mousePressed = true;
+                base.OnMouseDown(e);
+                Invalidate();
+            }
+
+            protected override void OnMouseUp(MouseEventArgs e)
+            {
+                if (e.Button == MouseButtons.Left) _mousePressed = false;
+                base.OnMouseUp(e);
+                Invalidate();
+            }
+
+            protected override void OnMouseCaptureChanged(EventArgs e)
+            {
+                if (!Capture) _mousePressed = false;
+                base.OnMouseCaptureChanged(e);
+                Invalidate();
+            }
+
+            protected override void OnKeyDown(KeyEventArgs e)
+            {
+                if (e.KeyCode == Keys.Space) _spacePressed = true;
+                base.OnKeyDown(e);
+                Invalidate();
+            }
+
+            protected override void OnKeyUp(KeyEventArgs e)
+            {
+                if (e.KeyCode == Keys.Space) _spacePressed = false;
+                base.OnKeyUp(e);
+                Invalidate();
+            }
+
+            protected override void OnLostFocus(EventArgs e)
+            {
+                _spacePressed = false;
+                base.OnLostFocus(e);
+                Invalidate();
+            }
 
             protected override void OnSizeChanged(EventArgs e)
             {
