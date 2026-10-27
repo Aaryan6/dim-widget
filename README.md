@@ -37,7 +37,20 @@ Right-click the icon by the clock.
 - **Pause dimming** turns the dark layer off until you turn it back on.
 - **Brightness** has 100%, 75%, 50%, and 25%. 100% is a normal screen.
 - **Start with Windows** opens Dim each time the computer turns on.
+- **Check for updates** opens the latest release page in your browser.
 - **Quit Dim** closes the program. The screen goes back to normal.
+
+## Updates
+
+Dim checks for a newer release shortly after startup and once a day while running.
+A tray notification appears once for each new version. Click it to open the download page.
+To install an update, quit Dim, replace your existing `DimWidget.exe` with the downloaded file, and open it again. Your settings are kept.
+
+If you have an older version without update notifications, download the latest version manually once to enable future notifications.
+
+Before publishing a release, update `AppVersion.Current` in `src/AppVersion.cs` to match the release tag, such as `1.0.6` for `v1.0.6`, then run `build.ps1` and upload `bin/DimWidget.exe`.
+
+Run `.\test-updates.ps1` to test update handling without network requests or visible notifications. Add `-Live` to also verify the GitHub connection.
 
 ## Turn it off
 

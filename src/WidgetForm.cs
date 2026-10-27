@@ -1,16 +1,14 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Drawing.Text;
 using System.Windows.Forms;
 
 namespace DimWidget
 {
     internal sealed class WidgetForm : Form
     {
-        // Geometry in 96-dpi units. The tab hangs from the top edge of the
-        // screen: square top corners, rounded bottom corners, and it grows
-        // sideways when open so it stays centred over the same spot.
+        // Original compact notch geometry in 96-dpi units, attached to the
+        // screen edge with square top corners and rounded bottom corners.
         private const int IdleWidth = 56;
         private const int IdleHeight = 22;
         private const int OpenWidth = 184;
@@ -24,24 +22,14 @@ namespace DimWidget
         private const int IdleRadius = 10;
         private const int OpenRadius = 12;
         private const float IconSize = 11f;
-        private const float KnobSize = 12f;
-        private const float TrackSize = 5f;
+        private const float KnobSize = 13f;
+        private const float TrackSize = 4f;
 
-        // Blur is sampled from the desktop behind the tab: 96-dpi radius of the
-        // three-pass box blur, doubled for the sampling margin that keeps the
-        // blurred pixels near the tab's edge from dragging in black.
-        // Floor between two backdrop resamples, in milliseconds.
-        private const int RefreshInterval = 300;
-
-        // A flat black plate, no sampling and no translucency: the notch is the
-        // same tone over every window, so nothing behind it can make it move.
-        private static readonly Color Panel = Color.Black;
-
-        private static readonly Color Ink = Color.FromArgb(231, 244, 251);
-        private static readonly Color InkMuted = Color.FromArgb(152, 178, 195);
-        private static readonly Color Accent = Color.FromArgb(150, 203, 227);
-        private static readonly Color Track = Color.FromArgb(58, 226, 241, 249);
-        private static readonly Color Border = Color.FromArgb(56, 255, 255, 255);
+        private static readonly Color Panel = Color.FromArgb(12, 14, 16);
+        private static readonly Color Ink = Color.FromArgb(244, 247, 248);
+        private static readonly Color InkMuted = Color.FromArgb(195, 207, 215);
+        private static readonly Color Accent = Color.FromArgb(204, 219, 228);
+        private static readonly Color Track = Color.FromArgb(46, 255, 255, 255);
 
         private readonly DimController _dim;
         private readonly Settings _settings;
@@ -60,6 +48,8 @@ namespace DimWidget
         private bool _dragArmed;
         private bool _dragMoved;
         private bool _suppressActivation;
+        private bool _translucent;
+        private bool _paintingGlass;
         private int _anchorX;
         private int _anchorTop;
         private Point _dragStartCursor;
@@ -102,17 +92,19 @@ namespace DimWidget
             AutoScaleMode = AutoScaleMode.None;
             BackColor = Panel;
             TopMost = true;
-            DoubleBuffered = true;
+            // GlassSurface supplies the single alpha-preserving window buffer.
+            DoubleBuffered = false;
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
             KeyPreview = true;
             Text = "Dim";
             ClientSize = new Size(Scale(IdleWidth), Scale(IdleHeight));
 
-            _fontValue = Theme.Ui(7.5f, FontStyle.Bold);
+            _fontValue = Theme.Ui(8.25f, FontStyle.Bold);
 
-            _quitButton = new RoundCloseButton(_scale);
+            _quitButton = new RoundCloseButton(this, _scale);
             _quitButton.AccessibleName = "Quit Dim";
             _quitButton.BackColor = Panel;
-            _quitButton.ForeColor = InkMuted;
+            _quitButton.ForeColor = Color.FromArgb(217, 224, 227);
             _quitButton.Cursor = Cursors.Hand;
             _quitButton.Visible = false;
             _quitButton.Click += delegate
@@ -135,13 +127,42 @@ namespace DimWidget
             ResumeLayout(false);
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ConfigureGlass();
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            // UiHost creates the HWND while hidden. A layered window needs an
+            // initial surface explicitly; invalidating the hidden HWND alone
+            // does not guarantee WM_PAINT when a collapsed notch is shown.
+            RenderGlass();
+        }
+
+        private void ConfigureGlass()
+        {
+            _translucent = !SystemInformation.HighContrast;
+            Invalidate(true);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            base.WndProc(ref m);
+            // Re-evaluate the solid fallback after theme or accessibility changes.
+            if (m.Msg == 0x031E || m.Msg == 0x031A || m.Msg == 0x001A)
+                ConfigureGlass();
+        }
+
         protected override CreateParams CreateParams
         {
             get
             {
                 CreateParams cp = base.CreateParams;
                 // Keep the widget out of the shell's window switcher.
-                cp.ExStyle |= NativeMethods.WS_EX_TOOLWINDOW;
+                cp.ExStyle |= NativeMethods.WS_EX_TOOLWINDOW | NativeMethods.WS_EX_LAYERED;
                 return cp;
             }
         }
@@ -206,12 +227,12 @@ namespace DimWidget
 
         public void SyncFromController()
         {
-            Invalidate();
+            Invalidate(true);
         }
 
         public void UpdateFromSettings()
         {
-            Invalidate();
+            Invalidate(true);
         }
 
         public void PromoteSelf()
@@ -305,23 +326,7 @@ namespace DimWidget
                 Scale(CloseWidth), Scale(CloseWidth));
             _quitButton.Visible = _expanded && _open >= 0.95f;
 
-            ApplyShape();
-            Invalidate();
-        }
-
-        private void ApplyShape()
-        {
-            Region previous = Region;
-
-            using (GraphicsPath path = BuildShape())
-            {
-                Region = new Region(path);
-            }
-
-            if (previous != null)
-            {
-                previous.Dispose();
-            }
+            Invalidate(true);
         }
 
         private float Radius
@@ -329,7 +334,7 @@ namespace DimWidget
             get
             {
                 float radius = ScaleF(IdleRadius + (OpenRadius - IdleRadius) * _open);
-                return Math.Max(0f, Math.Min(radius, Math.Min(ClientSize.Width, ClientSize.Height) / 2f));
+                return Math.Min(radius, Math.Min(ClientSize.Width, ClientSize.Height) / 2f);
             }
         }
 
@@ -338,25 +343,15 @@ namespace DimWidget
             return BuildTabPath(new RectangleF(0f, 0f, ClientSize.Width, ClientSize.Height), Radius);
         }
 
-        // Square top edge, rounded bottom corners: the tab is glued to the top
-        // of the screen, so only the corners that touch the desktop are curved.
         private static GraphicsPath BuildTabPath(RectangleF rect, float radius)
         {
             GraphicsPath path = new GraphicsPath();
-
-            if (rect.Width <= 0f || rect.Height <= 0f)
-            {
-                return path;
-            }
-
             float r = Math.Max(0f, Math.Min(radius, Math.Min(rect.Width, rect.Height) / 2f));
-
             if (r < 0.5f)
             {
                 path.AddRectangle(rect);
                 return path;
             }
-
             path.StartFigure();
             path.AddLine(rect.Left, rect.Top, rect.Left, rect.Bottom - r);
             path.AddArc(rect.Left, rect.Bottom - r * 2f, r * 2f, r * 2f, 180f, -90f);
@@ -364,43 +359,97 @@ namespace DimWidget
             path.AddArc(rect.Right - r * 2f, rect.Bottom - r * 2f, r * 2f, r * 2f, 90f, -90f);
             path.AddLine(rect.Right, rect.Bottom - r, rect.Right, rect.Top);
             path.CloseFigure();
-
             return path;
         }
 
+        protected override void OnPaintBackground(PaintEventArgs e) { }
+
         protected override void OnPaint(PaintEventArgs e)
         {
-            Graphics g = e.Graphics;
-            Theme.Prepare(g);
-            g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+            RenderGlass();
+        }
 
-            int width = ClientSize.Width;
-            int height = ClientSize.Height;
-
-            if (width <= 0 || height <= 0)
+        private void RenderGlass()
+        {
+            if (_paintingGlass || !IsHandleCreated || IsDisposed) return;
+            _paintingGlass = true;
+            try
             {
-                return;
+                GlassSurface.Present(Handle, Location, ClientSize, DrawContents);
             }
+            finally { _paintingGlass = false; }
+        }
 
-            using (GraphicsPath plate = BuildShape())
-            using (SolidBrush fill = new SolidBrush(Panel))
-            {
-                g.FillPath(fill, plate);
-            }
-
-            using (GraphicsPath shape = BuildTabPath(
-                new RectangleF(0.5f, 0f, width - 1f, height - 0.5f), Math.Max(1f, Radius - 0.5f)))
-            using (Pen pen = new Pen(Border, 1f))
-            {
-                Region previous = g.Clip;
-                g.SetClip(new RectangleF(0f, 1f, width, height), CombineMode.Replace);
-                g.DrawPath(pen, shape);
-                g.Clip = previous;
-                previous.Dispose();
-            }
-
+        private void DrawContents(Graphics g)
+        {
+            DrawGlass(g);
             DrawIcon(g);
             DrawPanel(g);
+            if (_quitButton != null && _expanded && _open >= 0.95f)
+            {
+                GraphicsState saved = g.Save();
+                g.TranslateTransform(_quitButton.Left, _quitButton.Top);
+                ((RoundCloseButton)_quitButton).DrawGlyph(g);
+                g.Restore(saved);
+            }
+        }
+
+        private void DrawGlass(Graphics g)
+        {
+            int width = ClientSize.Width;
+            int height = ClientSize.Height;
+            if (width < 1 || height < 1) return;
+            GraphicsState saved = g.Save();
+            using (GraphicsPath plate = BuildShape())
+            {
+                g.SetClip(plate, CombineMode.Intersect);
+                using (SolidBrush tint = new SolidBrush(Color.FromArgb(_translucent ? 205 : 255, Panel)))
+                    g.FillPath(tint, plate);
+
+                using (LinearGradientBrush body = new LinearGradientBrush(
+                    new RectangleF(0f, 0f, width, height), Color.White, Color.Black, 90f))
+                {
+                    body.InterpolationColors = new ColorBlend {
+                        Positions = new float[] { 0f, 0.17f, 0.46f, 0.53f, 0.86f, 1f },
+                        Colors = new Color[] { Color.FromArgb(45, Color.White), Color.FromArgb(12, Color.White),
+                            Color.FromArgb(0, Color.White), Color.FromArgb(10, Color.Black),
+                            Color.FromArgb(24, Color.Black), Color.FromArgb(7, Color.White) }
+                    };
+                    g.FillPath(body, plate);
+                }
+
+                // Broad, slanted reflection from the approved glass reference.
+                using (GraphicsPath reflection = new GraphicsPath())
+                using (LinearGradientBrush shine = new LinearGradientBrush(
+                    new RectangleF(0f, 0f, width, height * 0.65f),
+                    Color.FromArgb(46, Color.White), Color.FromArgb(9, Color.White), 90f))
+                {
+                    reflection.AddPolygon(new PointF[] { new PointF(0f, 0f), new PointF(width, 0f),
+                        new PointF(width, height * 0.28f), new PointF(0f, height * 0.58f) });
+                    g.FillPath(shine, reflection);
+                }
+            }
+            g.Restore(saved);
+
+            float edge = ScaleF(1f);
+            using (GraphicsPath rim = BuildTabPath(
+                new RectangleF(edge, -edge, width - edge * 2f, height), Radius - edge))
+            using (LinearGradientBrush silver = new LinearGradientBrush(
+                new RectangleF(0f, 0f, width, height), Color.White, Color.White, 90f))
+            {
+                silver.InterpolationColors = new ColorBlend {
+                    Positions = new float[] { 0f, 0.3f, 0.68f, 1f },
+                    Colors = new Color[] { Color.FromArgb(218, Color.White), Color.FromArgb(78, Color.White),
+                        Color.FromArgb(65, Color.White), Color.FromArgb(169, Color.White) }
+                };
+                using (Pen glow = new Pen(Color.FromArgb(28, Color.White), ScaleF(3f))) g.DrawPath(glow, rim);
+                using (Pen line = new Pen(silver, ScaleF(0.85f))) g.DrawPath(line, rim);
+            }
+            float inset = ScaleF(2.8f);
+            using (GraphicsPath inner = BuildTabPath(
+                new RectangleF(inset, -inset, width - inset * 2f, height), Radius - inset))
+            using (Pen line = new Pen(Color.FromArgb(34, Color.White), ScaleF(0.65f)))
+                g.DrawPath(line, inner);
         }
 
         private void DrawIcon(Graphics g)
@@ -415,7 +464,7 @@ namespace DimWidget
                 g.FillEllipse(disc, circle);
             }
 
-            // Left half in the theme ink: the little ice cube reads even at 14 px.
+            // Retain Dim's split-disc mark in the cooler glass palette.
             using (GraphicsPath half = new GraphicsPath())
             {
                 half.AddArc(circle, 90f, 180f);
@@ -423,7 +472,7 @@ namespace DimWidget
 
                 Region previous = g.Clip;
                 g.SetClip(half, CombineMode.Intersect);
-                using (SolidBrush shade = new SolidBrush(Color.FromArgb(205, Accent)))
+                using (SolidBrush shade = new SolidBrush(Color.FromArgb(164, 194, 208)))
                 {
                     g.FillEllipse(shade, circle);
                 }
@@ -484,25 +533,21 @@ namespace DimWidget
                 }
             }
 
-            using (SolidBrush ring = new SolidBrush(Fade(Color.White, Math.Max(0.35f, fade))))
+            RectangleF thumb = new RectangleF(knobX - knobRadius, centerY - knobRadius,
+                knobRadius * 2f, knobRadius * 2f);
+            using (SolidBrush shadow = new SolidBrush(Fade(Color.FromArgb(100, Color.Black), fade)))
             {
-                g.FillEllipse(
-                    ring,
-                    knobX - knobRadius,
-                    centerY - knobRadius,
-                    knobRadius * 2f,
-                    knobRadius * 2f);
+                RectangleF shadowBounds = thumb;
+                shadowBounds.Offset(0f, ScaleF(1.2f));
+                shadowBounds.Inflate(ScaleF(0.8f), ScaleF(0.8f));
+                g.FillEllipse(shadow, shadowBounds);
             }
-
-            float coreRadius = Math.Max(1f, knobRadius - ScaleF(2f));
-            using (SolidBrush core = new SolidBrush(Fade(Accent, Math.Max(0.35f, fade))))
+            using (LinearGradientBrush pearl = new LinearGradientBrush(thumb,
+                Fade(Color.White, fade), Fade(Color.FromArgb(174, 192, 202), fade), 55f))
+            using (Pen edge = new Pen(Fade(Color.FromArgb(210, Color.White), fade), ScaleF(0.8f)))
             {
-                g.FillEllipse(
-                    core,
-                    knobX - coreRadius,
-                    centerY - coreRadius,
-                    coreRadius * 2f,
-                    coreRadius * 2f);
+                g.FillEllipse(pearl, thumb);
+                g.DrawEllipse(edge, thumb);
             }
 
             float valueLeft = ClientSize.Width - ScaleF(RightPad + CloseWidth + CloseGap + ValueWidth);
@@ -514,14 +559,15 @@ namespace DimWidget
 
             Color ink = _dim.Suspended ? InkMuted : Ink;
 
-            TextRenderer.DrawText(
-                g,
-                _dim.Brightness + "%",
-                _fontValue,
-                box,
-                Fade(ink, Math.Max(0.3f, fade)),
-                TextFormatFlags.Right | TextFormatFlags.VerticalCenter
-                    | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+            // GDI+ keeps the text alpha intact on the glass surface.
+            using (StringFormat format = new StringFormat(StringFormat.GenericTypographic))
+            using (SolidBrush text = new SolidBrush(Fade(ink, fade)))
+            {
+                format.Alignment = StringAlignment.Far;
+                format.LineAlignment = StringAlignment.Center;
+                format.FormatFlags |= StringFormatFlags.NoWrap;
+                g.DrawString(_dim.Brightness + "%", _fontValue, text, box, format);
+            }
         }
 
         private bool TryGetSliderGeometry(out float left, out float right, out float centerY)
@@ -560,10 +606,7 @@ namespace DimWidget
         {
             amount = Math.Max(0f, Math.Min(1f, amount));
 
-            return Color.FromArgb(
-                (int)Math.Round(Panel.R + (color.R - Panel.R) * amount),
-                (int)Math.Round(Panel.G + (color.G - Panel.G) * amount),
-                (int)Math.Round(Panel.B + (color.B - Panel.B) * amount));
+            return Color.FromArgb((int)Math.Round(color.A * amount), color.R, color.G, color.B);
         }
 
         protected override void OnMouseEnter(EventArgs e)
@@ -849,42 +892,52 @@ namespace DimWidget
 
         private sealed class RoundCloseButton : Button
         {
+            private readonly WidgetForm _owner;
             private readonly float _scale;
             private bool _hovered;
             private bool _mousePressed;
             private bool _spacePressed;
 
-            public RoundCloseButton(float scale)
+            public RoundCloseButton(WidgetForm owner, float scale)
             {
+                _owner = owner;
                 _scale = scale;
                 FlatStyle = FlatStyle.Flat;
                 FlatAppearance.BorderSize = 0;
                 UseVisualStyleBackColor = false;
+                SetStyle(ControlStyles.OptimizedDoubleBuffer, false);
                 SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint
-                    | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+                    | ControlStyles.ResizeRedraw, true);
             }
 
             protected override bool ShowFocusCues { get { return false; } }
 
+            protected override void OnPaintBackground(PaintEventArgs e) { }
+
             protected override void OnPaint(PaintEventArgs e)
             {
-                // Own every pixel: the standard Button painter can leave a
-                // one-pixel edge in focused, default, or pressed states.
+                // Retain Button's hit testing, keyboard and accessibility, but
+                // draw its glyph into the parent's single layered surface.
+                _owner.RenderGlass();
+            }
+
+            public void DrawGlyph(Graphics g)
+            {
                 bool pressed = Enabled && ((_mousePressed && _hovered) || _spacePressed);
-                Color background = pressed ? Color.FromArgb(70, 35, 35)
-                    : Enabled && _hovered ? Color.FromArgb(45, 45, 45) : BackColor;
-                e.Graphics.Clear(background);
+                Color highlight = pressed ? Color.FromArgb(65, 156, 89, 89)
+                    : Color.FromArgb(Enabled && _hovered ? 24 : 0, Color.White);
+                using (SolidBrush fill = new SolidBrush(highlight))
+                    g.FillEllipse(fill, new RectangleF(0f, 0f, Width - 1f, Height - 1f));
 
                 float centerX = (ClientSize.Width - 1) / 2f;
                 float centerY = (ClientSize.Height - 1) / 2f;
                 float radius = 4f * _scale;
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using (Pen stroke = new Pen(ForeColor, 1.2f * _scale))
+                using (Pen stroke = new Pen(ForeColor, 1f * _scale))
                 {
                     stroke.StartCap = stroke.EndCap = LineCap.Round;
-                    e.Graphics.DrawLine(stroke, centerX - radius, centerY - radius,
+                    g.DrawLine(stroke, centerX - radius, centerY - radius,
                         centerX + radius, centerY + radius);
-                    e.Graphics.DrawLine(stroke, centerX + radius, centerY - radius,
+                    g.DrawLine(stroke, centerX + radius, centerY - radius,
                         centerX - radius, centerY + radius);
                 }
             }
@@ -968,12 +1021,6 @@ namespace DimWidget
 
                 _closeDelay.Tick -= OnCloseDelayTick;
                 _closeDelay.Dispose();
-
-                Region region = Region;
-                if (region != null)
-                {
-                    region.Dispose();
-                }
 
                 _fontValue.Dispose();
             }

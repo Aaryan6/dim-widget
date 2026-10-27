@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -17,6 +18,8 @@ namespace DimWidget
         private readonly System.Windows.Forms.Timer _desktopTimer;
         private readonly Control _mainSync;
         private readonly Thread _showListener;
+        private readonly UpdateManager _updates;
+        private readonly UpdateTray _updateTray;
         private UiHost _ui;
         private string _trayText;
         private int _offDesktopTicks;
@@ -61,6 +64,11 @@ namespace DimWidget
 
             _menu.Items.Add(new ToolStripSeparator());
 
+            ToolStripMenuItem updatesItem = new ToolStripMenuItem("Check for updates");
+            _menu.Items.Add(updatesItem);
+
+            _menu.Items.Add(new ToolStripSeparator());
+
             ToolStripMenuItem quitItem = new ToolStripMenuItem("Quit Dim");
             quitItem.Click += OnMenuQuit;
             _menu.Items.Add(quitItem);
@@ -71,6 +79,9 @@ namespace DimWidget
             _tray.ContextMenuStrip = _menu;
             _tray.Visible = true;
             _tray.MouseClick += OnTrayClick;
+
+            _updates = new UpdateManager();
+            _updateTray = new UpdateTray(_updates, _tray, updatesItem, OpenDownloadPage);
 
             _keys = new KeyboardHook();
             _keys.Pressed += OnHotkey;
@@ -115,6 +126,9 @@ namespace DimWidget
                     "Grab the tab at the top of the screen, or use Ctrl+Alt+scroll wheel.",
                     ToolTipIcon.None);
             }
+
+            // Delay the first request so startup and the welcome tip stay responsive.
+            _updates.Start();
         }
 
         private UiHost CreateUi()
@@ -272,6 +286,20 @@ namespace DimWidget
         private void OnMenuQuit(object sender, EventArgs e)
         {
             OnMain(Shutdown);
+        }
+
+        private void OpenDownloadPage(Uri page)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(page.AbsoluteUri) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                DebugLog.Write("open update page failed: " + ex.GetType().Name);
+                MessageBox.Show("Open this page to download Dim:\n" + page.AbsoluteUri,
+                    "Dim updates", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
 
         private void OnHotkey(int id)
@@ -466,6 +494,9 @@ namespace DimWidget
 
             _shutdownStarted = true;
             _running = false;
+
+            _updateTray.Dispose();
+            _updates.Dispose();
 
             _desktopTimer.Stop();
             _desktopTimer.Tick -= OnDesktopTick;

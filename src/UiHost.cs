@@ -171,6 +171,10 @@ namespace DimWidget
             WidgetForm widget = _widget;
             if (widget != null)
             {
+                // Showing an overlay after 100% brightness or pause can put it
+                // above the notch. Restore order now, before the next repaint,
+                // rather than waiting for the periodic topmost check.
+                widget.PromoteSelf();
                 widget.SyncFromController();
             }
 
