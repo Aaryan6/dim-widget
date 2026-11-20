@@ -20,6 +20,8 @@ namespace DimWidget
         public const int WS_EX_LAYERED = 0x00080000;
         public const int WS_EX_NOACTIVATE = 0x08000000;
 
+        public const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
+
         public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
 
         public const uint SWP_NOSIZE = 0x0001;
@@ -45,6 +47,10 @@ namespace DimWidget
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
 
 
 

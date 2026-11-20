@@ -9,6 +9,6 @@ namespace DimWidget
     internal static class AppVersion
     {
         // Bump this to match the GitHub release tag before building a release.
-        public const string Current = "1.0.6";
+        public const string Current = "1.0.7";
     }
 }

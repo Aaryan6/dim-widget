@@ -20,7 +20,15 @@ An icon shows up by the clock. A small tab also appears at the top of the screen
 
 Click the tab at the top of the screen, then drag the slider.
 
+On supported laptops, one slider controls the whole range. Move it left to lower Windows brightness. Past the small minimum marker, Windows stays at its lowest brightness and Dim adds extra dimming. Move right to brighten the screen again.
+
+The percentage shows Windows brightness in the normal range. A negative percentage shows extra dimming below the hardware minimum, such as -50%. The leftmost fifth of the slider is reserved for extra dimming.
+
+Dim reads your current Windows brightness when it starts and stays in sync with Windows and your brightness keys. Pausing or quitting Dim removes extra dimming and leaves Windows brightness as you set it. Displays without Windows brightness support use software dimming across the whole slider.
+
 You can also hold the Ctrl and Alt keys and roll the mouse wheel.
+
+On Windows 10 version 2004 or later and Windows 11, the dimming layer is excluded from screenshots and screen recordings that use Windows capture APIs. Your screen stays dim while the captured image keeps its original brightness.
 
 ## Shortcuts
 
@@ -48,9 +56,13 @@ To install an update, quit Dim, replace your existing `DimWidget.exe` with the d
 
 If you have an older version without update notifications, download the latest version manually once to enable future notifications.
 
-Before publishing a release, update `AppVersion.Current` in `src/AppVersion.cs` to match the release tag, such as `1.0.6` for `v1.0.6`, then run `build.ps1` and upload `bin/DimWidget.exe`.
+Before publishing a release, update `AppVersion.Current` in `src/AppVersion.cs` to match the release tag, such as `1.0.7` for `v1.0.7`, then run `build.ps1` and upload `bin/DimWidget.exe`.
 
 Run `.\test-updates.ps1` to test update handling without network requests or visible notifications. Add `-Live` to also verify the GitHub connection.
+
+Run `.\test-capture.ps1` on an interactive desktop to verify screenshot brightness, including after an overlay is recreated. It briefly displays a small test swatch.
+
+Run `.\test-brightness.ps1` to test Windows brightness handling. Add `-Live` to briefly change the laptop's actual brightness and restore its original value.
 
 ## Turn it off
 

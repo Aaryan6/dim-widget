@@ -18,6 +18,7 @@ $references = @(
     (Join-Path $framework 'mscorlib.dll'),
     (Join-Path $framework 'System.dll'),
     (Join-Path $framework 'System.Core.dll'),
+    (Join-Path $framework 'System.Management.dll'),
     (Join-Path $framework 'System.Net.Http.dll'),
     (Join-Path $framework 'System.Runtime.Serialization.dll'),
     (Join-Path $framework 'System.Drawing.dll'),

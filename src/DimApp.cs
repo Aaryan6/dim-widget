@@ -375,7 +375,7 @@ namespace DimWidget
             UiHost ui = _ui;
             string text = (ui != null && ui.Suspended)
                 ? "Dim · paused"
-                : "Dim · " + (ui == null ? 0 : ui.Brightness) + "%";
+                : "Dim · " + (ui == null ? "0%" : ui.BrightnessText);
 
             if (text == _trayText)
             {

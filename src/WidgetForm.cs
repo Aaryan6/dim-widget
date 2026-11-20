@@ -11,10 +11,10 @@ namespace DimWidget
         // screen edge with square top corners and rounded bottom corners.
         private const int IdleWidth = 56;
         private const int IdleHeight = 22;
-        private const int OpenWidth = 184;
+        private const int OpenWidth = 194;
         private const int OpenHeight = 32;
         private const int HandleWidth = 30;
-        private const int ValueWidth = 29;
+        private const int ValueWidth = 39;
         private const int RightPad = 8;
         private const int Gap = 8;
         private const int CloseWidth = 20;
@@ -24,6 +24,7 @@ namespace DimWidget
         private const float IconSize = 11f;
         private const float KnobSize = 13f;
         private const float TrackSize = 4f;
+        private const float IdleOpacity = 0.18f;
 
         private static readonly Color Panel = Color.FromArgb(12, 14, 16);
         private static readonly Color Ink = Color.FromArgb(244, 247, 248);
@@ -36,6 +37,7 @@ namespace DimWidget
         private readonly float _scale;
         private readonly Font _fontValue;
         private readonly Button _quitButton;
+        private readonly ToolTip _brightnessHint;
         private readonly System.Windows.Forms.Timer _animate;
         private readonly System.Windows.Forms.Timer _closeDelay;
 
@@ -113,6 +115,7 @@ namespace DimWidget
                 if (handler != null) handler(this, EventArgs.Empty);
             };
             Controls.Add(_quitButton);
+            _brightnessHint = new ToolTip();
 
             _animate = new System.Windows.Forms.Timer();
             _animate.Interval = 16;
@@ -227,7 +230,11 @@ namespace DimWidget
 
         public void SyncFromController()
         {
-            Invalidate(true);
+            _brightnessHint.SetToolTip(this, _dim.SystemBrightness.Error
+                ?? (_dim.SystemBrightness.Available
+                    ? "Windows brightness. Move left past the marker for extra dimming. Negative percentages show extra dimming."
+                    : "Extra dimming. Windows brightness control is unavailable on this display."));
+            ApplyLayout();
         }
 
         public void UpdateFromSettings()
@@ -310,8 +317,10 @@ namespace DimWidget
 
         private void ApplyLayout()
         {
-            int width = Math.Max(1, (int)Math.Round(ScaleF(IdleWidth + (OpenWidth - IdleWidth) * _open)));
-            int height = Math.Max(1, (int)Math.Round(ScaleF(IdleHeight + (OpenHeight - IdleHeight) * _open)));
+            int openWidth = OpenWidth;
+            int openHeight = OpenHeight;
+            int width = Math.Max(1, (int)Math.Round(ScaleF(IdleWidth + (openWidth - IdleWidth) * _open)));
+            int height = Math.Max(1, (int)Math.Round(ScaleF(IdleHeight + (openHeight - IdleHeight) * _open)));
 
             if (ClientSize.Width != width || ClientSize.Height != height)
             {
@@ -375,7 +384,10 @@ namespace DimWidget
             _paintingGlass = true;
             try
             {
-                GlassSurface.Present(Handle, Location, ClientSize, DrawContents);
+                // Nearly invisible at rest; fades to fully opaque as it opens on hover.
+                float visible = IdleOpacity + (1f - IdleOpacity) * SmoothStep(_open * 2f);
+                GlassSurface.Present(Handle, Location, ClientSize, DrawContents,
+                    (byte)Math.Round(255f * visible));
             }
             finally { _paintingGlass = false; }
         }
@@ -506,7 +518,8 @@ namespace DimWidget
             float knobRadius = ScaleF(KnobSize) / 2f;
             float trackHeight = ScaleF(TrackSize);
             float usable = right - left - knobRadius * 2f;
-            float ratio = Math.Max(0f, Math.Min(1f, _dim.Brightness / 100f));
+            int value = _dim.ControlBrightness;
+            float ratio = Math.Max(0f, Math.Min(1f, value / 100f));
             float knobX = left + knobRadius + usable * ratio;
 
             RectangleF track = new RectangleF(left, centerY - trackHeight / 2f, right - left, trackHeight);
@@ -515,6 +528,13 @@ namespace DimWidget
             using (SolidBrush brush = new SolidBrush(Fade(Track, fade)))
             {
                 g.FillPath(brush, path);
+            }
+
+            if (_dim.SystemBrightness.Available)
+            {
+                float minimumX = left + knobRadius + usable * DimController.HardwareMinimumPosition / 100f;
+                using (Pen marker = new Pen(Fade(InkMuted, fade * 0.7f), ScaleF(1f)))
+                    g.DrawLine(marker, minimumX, centerY + ScaleF(5f), minimumX, centerY + ScaleF(7f));
             }
 
             float filled = knobX - left;
@@ -553,9 +573,9 @@ namespace DimWidget
             float valueLeft = ClientSize.Width - ScaleF(RightPad + CloseWidth + CloseGap + ValueWidth);
             Rectangle box = new Rectangle(
                 (int)Math.Round(valueLeft),
-                0,
+                (int)Math.Round(centerY - ScaleF(14f)),
                 (int)Math.Round(ScaleF(ValueWidth)),
-                ClientSize.Height);
+                Scale(28));
 
             Color ink = _dim.Suspended ? InkMuted : Ink;
 
@@ -566,7 +586,7 @@ namespace DimWidget
                 format.Alignment = StringAlignment.Far;
                 format.LineAlignment = StringAlignment.Center;
                 format.FormatFlags |= StringFormatFlags.NoWrap;
-                g.DrawString(_dim.Brightness + "%", _fontValue, text, box, format);
+                g.DrawString(_dim.BrightnessText, _fontValue, text, box, format);
             }
         }
 
@@ -576,12 +596,12 @@ namespace DimWidget
             right = 0f;
             centerY = 0f;
 
-            if (ClientSize.Width < Scale(118))
+            if (ClientSize.Width < Scale(128))
             {
                 return false;
             }
 
-            left = ScaleF(HandleWidth) + ScaleF(1f);
+            left = ScaleF(HandleWidth + 1f);
             right = ClientSize.Width - ScaleF(RightPad + CloseWidth + CloseGap + ValueWidth + Gap);
             centerY = ClientSize.Height / 2f;
 
@@ -646,6 +666,7 @@ namespace DimWidget
 
                 if (_expanded
                     && TryGetSliderGeometry(out left, out right, out centerY)
+                    && Math.Abs(e.Y - centerY) <= Scale(13)
                     && e.X >= left - Scale(1)
                     && e.X <= right + Scale(8))
                 {
@@ -698,6 +719,7 @@ namespace DimWidget
 
             if (_expanded
                 && TryGetSliderGeometry(out left, out right, out centerY)
+                && Math.Abs(e.Y - centerY) <= Scale(13)
                 && e.X >= left - Scale(1)
                 && e.X <= right + Scale(8))
             {
@@ -835,7 +857,7 @@ namespace DimWidget
             float ratio = (x - from) / span;
             ratio = Math.Max(0f, Math.Min(1f, ratio));
 
-            _dim.SetBrightness((int)Math.Round(ratio * 100f));
+            _dim.SetSliderBrightness(ratio * 100d);
             Invalidate();
         }
 
@@ -1023,6 +1045,7 @@ namespace DimWidget
                 _closeDelay.Dispose();
 
                 _fontValue.Dispose();
+                _brightnessHint.Dispose();
             }
 
             base.Dispose(disposing);

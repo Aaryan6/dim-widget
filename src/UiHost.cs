@@ -23,6 +23,7 @@ namespace DimWidget
 
         private int _brightness;
         private int _suspended;
+        private string _brightnessText;
         private long _widgetHandle;
 
         public UiHost(Settings settings)
@@ -30,6 +31,7 @@ namespace DimWidget
             _settings = settings;
             _brightness = settings.Brightness;
             _suspended = settings.Suspended ? 1 : 0;
+            _brightnessText = settings.Brightness + "%";
         }
 
         public event EventHandler Changed;
@@ -49,6 +51,8 @@ namespace DimWidget
         {
             get { return _suspended != 0; }
         }
+
+        public string BrightnessText { get { return _brightnessText; } }
 
         public IntPtr WidgetHandle
         {
@@ -102,6 +106,7 @@ namespace DimWidget
                 _dim = dim;
                 _widget = widget;
                 _brightness = dim.Brightness;
+                _brightnessText = dim.BrightnessText;
                 _suspended = dim.Suspended ? 1 : 0;
                 Interlocked.Exchange(ref _widgetHandle, widget.Handle.ToInt64());
 
@@ -165,6 +170,7 @@ namespace DimWidget
             if (dim != null)
             {
                 _brightness = dim.Brightness;
+                _brightnessText = dim.BrightnessText;
                 _suspended = dim.Suspended ? 1 : 0;
             }
 

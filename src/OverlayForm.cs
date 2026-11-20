@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace DimWidget
@@ -30,6 +31,24 @@ namespace DimWidget
         protected override bool ShowWithoutActivation
         {
             get { return true; }
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+
+            // Older Windows versions interpret exclusion as WDA_MONITOR,
+            // which would turn a full-screen overlay into a black screenshot.
+            if (Environment.OSVersion.Version < new Version(10, 0, 19041))
+            {
+                return;
+            }
+
+            // Apply to every new HWND, including recreated monitor overlays.
+            if (!NativeMethods.SetWindowDisplayAffinity(Handle, NativeMethods.WDA_EXCLUDEFROMCAPTURE))
+            {
+                DebugLog.Write("Could not exclude dim overlay from capture: " + Marshal.GetLastWin32Error());
+            }
         }
 
         protected override CreateParams CreateParams

@@ -11,7 +11,8 @@ namespace DimWidget
     // even when a custom window region is set, so it cannot be used here.
     internal static class GlassSurface
     {
-        public static void Present(IntPtr window, Point location, Size size, Action<Graphics> draw)
+        public static void Present(IntPtr window, Point location, Size size, Action<Graphics> draw,
+            byte opacity = 255)
         {
             if (size.Width < 1 || size.Height < 1) return;
             using (Bitmap buffer = new Bitmap(size.Width, size.Height, PixelFormat.Format32bppPArgb))
@@ -23,11 +24,11 @@ namespace DimWidget
                     graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
                     draw(graphics);
                 }
-                PresentBitmap(window, location, buffer);
+                PresentBitmap(window, location, buffer, opacity);
             }
         }
 
-        private static void PresentBitmap(IntPtr window, Point location, Bitmap bitmap)
+        private static void PresentBitmap(IntPtr window, Point location, Bitmap bitmap, byte opacity)
         {
             IntPtr source = CreateCompatibleDC(IntPtr.Zero);
             IntPtr dib = IntPtr.Zero;
@@ -65,7 +66,7 @@ namespace DimWidget
                 NativePoint origin = new NativePoint { X = location.X, Y = location.Y };
                 NativePoint offset = new NativePoint();
                 NativeSize size = new NativeSize { Width = bitmap.Width, Height = bitmap.Height };
-                BlendFunction blend = new BlendFunction { ConstantAlpha = 255, AlphaFormat = 1 };
+                BlendFunction blend = new BlendFunction { ConstantAlpha = opacity, AlphaFormat = 1 };
                 if (!UpdateLayeredWindow(window, IntPtr.Zero, ref origin, ref size, source,
                     ref offset, 0, ref blend, 2))
                     throw new Win32Exception(Marshal.GetLastWin32Error());
